@@ -205,7 +205,7 @@ where
 
             // Periodic checkpoint
             if let Some(run) = &mut self.run {
-                if total % self.checkpoint_freq == 0 {
+                if total.is_multiple_of(self.checkpoint_freq) {
                     let path = run.checkpoint_path(total);
                     // Strip the .mpk extension — DqnAgent::save appends it
                     let path_no_ext = path.with_extension("");

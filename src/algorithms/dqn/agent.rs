@@ -117,7 +117,7 @@ where
         layer_sizes.push(num_actions);
 
         let online_net = QNetwork::new(&layer_sizes, &device);
-        let target_net = QNetwork::new(&layer_sizes, &device.clone().into());
+        let target_net = QNetwork::new(&layer_sizes, &device.clone());
 
         let optimiser = AdamConfig::new()
             .with_epsilon(1e-8)
@@ -147,7 +147,7 @@ where
         self.total_steps += 1;
 
         // Sync target network periodically
-        if self.total_steps % self.config.target_update_freq == 0 {
+        if self.total_steps.is_multiple_of(self.config.target_update_freq) {
             self.sync_target();
         }
 
@@ -234,7 +234,7 @@ where
             self.online_net.valid(),
             self.encoder,
             self.action_mapper,
-            self.device.into(),
+            self.device,
         )
     }
 
@@ -269,7 +269,7 @@ where
         let obs_tensor = self.encoder.encode_batch(&obs_batch, &self.device);
         // next_obs is encoded on the inner (non-autodiff) backend — no gradients needed
         let next_obs_tensor = self.encoder
-            .encode_batch(&next_obs_batch, &self.device.clone().into());
+            .encode_batch(&next_obs_batch, &self.device.clone());
 
         // Action indices, rewards, bootstrap masks
         let action_indices: Vec<usize> = batch.iter()
