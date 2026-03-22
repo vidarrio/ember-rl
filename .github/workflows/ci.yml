@@ -39,5 +39,5 @@ jobs:
             echo "Version $CURRENT is already on crates.io — skipping publish"
           else
             echo "Publishing version $CURRENT"
-            cargo publish
+            cargo publish --allow-dirty
           fi
