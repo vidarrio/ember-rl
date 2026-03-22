@@ -4,7 +4,7 @@
 /// The defaults reflect standard DQN practice suitable for moderately
 /// complex environments. Simple environments like CartPole will want
 /// smaller buffer/warmup values and faster epsilon decay.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DqnConfig {
     /// Discount factor γ. Controls how much future rewards are valued.
     /// Typical values: 0.95–0.999. Default: 0.99

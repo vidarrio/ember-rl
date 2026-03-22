@@ -1,9 +1,12 @@
+use std::path::Path;
+
 use burn::prelude::*;
 use burn::tensor::backend::AutodiffBackend;
 use burn::module::AutodiffModule;
 use burn::optim::{Adam, AdamConfig, GradientsParams, Optimizer};
 use burn::optim::adaptor::OptimizerAdaptor;
 use burn::nn::loss::{HuberLossConfig, Reduction};
+use burn::record::{CompactRecorder, RecorderError};
 use rand::{Rng, SeedableRng};
 use rand::rngs::SmallRng;
 use rl_traits::{Environment, Experience, Policy};
@@ -23,18 +26,23 @@ use rl_traits::ReplayBuffer;
 /// - `Enc`: the observation encoder (converts `E::Observation` to tensors)
 /// - `Act`: the action mapper (converts `E::Action` to/from integer indices)
 /// - `B`: the Burn backend (e.g. `NdArray`, `Wgpu`)
+/// - `Buf`: the replay buffer (defaults to `CircularBuffer` — swap for PER etc.)
 ///
 /// # Usage
 ///
 /// ```rust,ignore
-/// let agent = DqnAgent::new(encoder, action_mapper, config, device);
+/// let agent = DqnAgent::new(encoder, action_mapper, config, device, seed);
 /// ```
 ///
 /// Then hand it to `DqnRunner`, which drives the training loop.
-pub struct DqnAgent<E, Enc, Act, B>
+pub struct DqnAgent<E, Enc, Act, B, Buf = CircularBuffer<
+    <E as Environment>::Observation,
+    <E as Environment>::Action,
+>>
 where
     E: Environment,
     B: AutodiffBackend,
+    Buf: ReplayBuffer<E::Observation, E::Action>,
 {
     // Network pair
     online_net: QNetwork<B>,
@@ -44,7 +52,7 @@ where
     optimiser: OptimizerAdaptor<Adam, QNetwork<B>, B>,
 
     // Experience replay
-    buffer: CircularBuffer<E::Observation, E::Action>,
+    buffer: Buf,
 
     // Encoding
     encoder: Enc,
@@ -69,7 +77,37 @@ where
     Act: DiscreteActionMapper<E::Action>,
     B: AutodiffBackend,
 {
+    /// Create a new agent using the default `CircularBuffer` replay buffer.
+    ///
+    /// Buffer capacity is taken from `config.buffer_capacity`.
     pub fn new(encoder: Enc, action_mapper: Act, config: DqnConfig, device: B::Device, seed: u64) -> Self {
+        let buffer = CircularBuffer::new(config.buffer_capacity);
+        Self::new_with_buffer(encoder, action_mapper, config, device, seed, buffer)
+    }
+}
+
+impl<E, Enc, Act, B, Buf> DqnAgent<E, Enc, Act, B, Buf>
+where
+    E: Environment,
+    E::Observation: Clone + Send + Sync + 'static,
+    E::Action: Clone + Send + Sync + 'static,
+    Enc: ObservationEncoder<E::Observation, B> + ObservationEncoder<E::Observation, B::InnerBackend>,
+    Act: DiscreteActionMapper<E::Action>,
+    B: AutodiffBackend,
+    Buf: ReplayBuffer<E::Observation, E::Action>,
+{
+    /// Create a new agent with a custom replay buffer.
+    ///
+    /// Use this to swap in prioritised experience replay or any other
+    /// `ReplayBuffer` implementation in place of the default `CircularBuffer`.
+    pub fn new_with_buffer(
+        encoder: Enc,
+        action_mapper: Act,
+        config: DqnConfig,
+        device: B::Device,
+        seed: u64,
+        buffer: Buf,
+    ) -> Self {
         let obs_size = <Enc as ObservationEncoder<E::Observation, B>>::obs_size(&encoder);
         let num_actions = action_mapper.num_actions();
 
@@ -84,8 +122,6 @@ where
         let optimiser = AdamConfig::new()
             .with_epsilon(1e-8)
             .init::<B, QNetwork<B>>();
-
-        let buffer = CircularBuffer::new(config.buffer_capacity);
 
         Self {
             online_net,
@@ -147,6 +183,67 @@ where
         } else {
             self.act(obs)
         }
+    }
+
+    /// Save the online network weights to a file.
+    ///
+    /// Uses Burn's `CompactRecorder` (MessagePack format). The recorder appends
+    /// its own extension to the path, so `save("run/cartpole")` produces
+    /// `run/cartpole.mpk`.
+    ///
+    /// Only the online network weights are saved — the target network,
+    /// replay buffer, and optimizer state are not included. This is sufficient
+    /// for inference. To resume training, call `load` followed by
+    /// `set_total_steps` to restore the correct epsilon.
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), RecorderError> {
+        self.online_net
+            .clone()
+            .save_file(path.as_ref().to_path_buf(), &CompactRecorder::new())
+            .map(|_| ())
+    }
+
+    /// Load network weights from a file into this agent.
+    ///
+    /// Loads into the online network and immediately syncs the target network.
+    /// Takes `self` by value and returns the updated agent so you can chain
+    /// with the constructor:
+    ///
+    /// ```rust,ignore
+    /// let agent = DqnAgent::new(...).load("run/cartpole")?;
+    /// ```
+    pub fn load(mut self, path: impl AsRef<Path>) -> Result<Self, RecorderError> {
+        self.online_net = self
+            .online_net
+            .load_file(path.as_ref().to_path_buf(), &CompactRecorder::new(), &self.device)?;
+        self.target_net = self.online_net.valid();
+        Ok(self)
+    }
+
+    /// Convert this trained agent into an inference-only `DqnPolicy`.
+    ///
+    /// Strips all training state (optimizer, buffer, RNG) and downcasts the
+    /// network to `B::InnerBackend` (no autodiff). Use this when training is
+    /// complete and you want a lightweight policy for evaluation or deployment.
+    ///
+    /// ```rust,ignore
+    /// let policy = runner.into_agent().into_policy();
+    /// let action = policy.act(&obs);
+    /// ```
+    pub fn into_policy(self) -> super::inference::DqnPolicy<E, Enc, Act, B::InnerBackend> {
+        super::inference::DqnPolicy::from_network(
+            self.online_net.valid(),
+            self.encoder,
+            self.action_mapper,
+            self.device.into(),
+        )
+    }
+
+    /// Override the internal step counter.
+    ///
+    /// Useful when resuming training — restores epsilon to the correct value
+    /// for the point in training where the checkpoint was saved.
+    pub fn set_total_steps(&mut self, steps: usize) {
+        self.total_steps = steps;
     }
 
     /// Sync target network weights from the online network.
@@ -223,12 +320,13 @@ where
     }
 }
 
-impl<E, Enc, Act, B> Policy<E::Observation, E::Action> for DqnAgent<E, Enc, Act, B>
+impl<E, Enc, Act, B, Buf> Policy<E::Observation, E::Action> for DqnAgent<E, Enc, Act, B, Buf>
 where
     E: Environment,
     Enc: ObservationEncoder<E::Observation, B>,
     Act: DiscreteActionMapper<E::Action>,
     B: AutodiffBackend,
+    Buf: ReplayBuffer<E::Observation, E::Action>,
 {
     /// Greedy action selection (no exploration).
     ///

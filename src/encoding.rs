@@ -80,6 +80,7 @@ pub trait DiscreteActionMapper<A> {
 /// A trivial encoder for environments whose observations are already `Vec<f32>`.
 ///
 /// Useful for getting something running quickly without boilerplate.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct VecEncoder {
     size: usize,
 }
@@ -108,6 +109,7 @@ impl<B: Backend> ObservationEncoder<Vec<f32>, B> for VecEncoder {
 }
 
 /// A trivial action mapper for environments whose actions are plain `usize`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct UsizeActionMapper {
     num_actions: usize,
 }
