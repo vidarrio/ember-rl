@@ -1,0 +1,16 @@
+[package]
+name = "ember-rl"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+envs = []
+
+[[example]]
+name = "cartpole"
+required-features = ["envs"]
+
+[dependencies]
+rl-traits = "*"
+burn = { version = "0.20.1", features = ["ndarray", "autodiff"] }
+rand = { version = "0.8", features = ["small_rng"] }
