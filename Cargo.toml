@@ -16,6 +16,6 @@ name = "cartpole"
 required-features = ["envs"]
 
 [dependencies]
-rl-traits = "*"
+rl-traits = "0.2"
 burn = { version = "0.20.1", features = ["ndarray", "autodiff"] }
 rand = { version = "0.8", features = ["small_rng"] }
