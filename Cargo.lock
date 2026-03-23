@@ -2062,8 +2062,9 @@ dependencies = [
 
 [[package]]
 name = "ember-rl"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
+ "anyhow",
  "burn",
  "chrono",
  "rand 0.8.5",
@@ -4684,9 +4685,7 @@ dependencies = [
 
 [[package]]
 name = "rl-traits"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25748e9e6650d1372e7572ac5be3f8739621b52c60a4d3a838755ce71d6d5a25"
+version = "0.2.2"
 dependencies = [
  "rand 0.8.5",
 ]

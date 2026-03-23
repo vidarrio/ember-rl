@@ -67,6 +67,11 @@ impl EpisodeRecord {
         self.extras.insert(key.into(), value);
         self
     }
+
+    pub fn with_extras(mut self, extras: HashMap<String, f64>) -> Self {
+        self.extras.extend(extras);
+        self
+    }
 }
 
 // ── Aggregator trait ─────────────────────────────────────────────────────────
@@ -203,6 +208,36 @@ impl Aggregator for RollingMean {
 
     fn reset(&mut self) {
         self.buf.clear();
+    }
+}
+
+/// Population standard deviation over all values seen since the last reset.
+///
+/// Uses Welford's online algorithm for numerical stability.
+#[derive(Debug, Clone, Default)]
+pub struct Std {
+    count: usize,
+    mean: f64,
+    m2: f64,
+}
+
+impl Aggregator for Std {
+    fn update(&mut self, value: f64) {
+        self.count += 1;
+        let delta = value - self.mean;
+        self.mean += delta / self.count as f64;
+        let delta2 = value - self.mean;
+        self.m2 += delta * delta2;
+    }
+
+    fn value(&self) -> f64 {
+        if self.count < 2 { f64::NAN } else { (self.m2 / self.count as f64).sqrt() }
+    }
+
+    fn reset(&mut self) {
+        self.count = 0;
+        self.mean = 0.0;
+        self.m2 = 0.0;
     }
 }
 

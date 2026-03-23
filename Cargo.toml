@@ -1,6 +1,6 @@
 [package]
 name = "ember-rl"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Reinforcement learning algorithm implementations (DQN, PPO, SAC) using Burn"
 license = "MIT OR Apache-2.0"
@@ -16,9 +16,10 @@ name = "cartpole"
 required-features = ["envs"]
 
 [dependencies]
-rl-traits = "0.2"
+rl-traits = "0.2.2"
 burn = { version = "0.20.1", features = ["ndarray", "autodiff"] }
 rand = { version = "0.8", features = ["small_rng"] }
+anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }

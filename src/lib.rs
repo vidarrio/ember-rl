@@ -39,6 +39,7 @@
 pub mod algorithms;
 pub mod encoding;
 pub mod stats;
+pub mod traits;
 pub mod training;
 
 #[cfg(feature = "envs")]

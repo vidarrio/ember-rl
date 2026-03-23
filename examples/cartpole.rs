@@ -82,7 +82,7 @@ fn train_mode() {
 
     println!("Run directory: {}", run.dir().display());
 
-    let mut trainer = DqnTrainer::new(CartPoleEnv::new(), agent, 3)
+    let mut trainer = DqnTrainer::new(CartPoleEnv::new(), agent)
         .with_run(run)
         .with_checkpoint_freq(CHECKPOINT_FREQ)
         .with_keep_checkpoints(3);
