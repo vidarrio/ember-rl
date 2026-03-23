@@ -260,9 +260,12 @@ where
     fn act(&mut self, obs: &E::Observation, mode: ActMode) -> E::Action {
         match mode {
             ActMode::Exploit => {
-                // Greedy argmax — no RNG needed.
-                let obs_tensor = self.encoder.encode(obs, &self.device).unsqueeze_dim(0);
-                let q_values = self.online_net.forward(obs_tensor);
+                // Greedy argmax via the inner (non-autodiff) network — no gradient
+                // bookkeeping overhead, same weights, same device type.
+                let obs_tensor = ObservationEncoder::<E::Observation, B::InnerBackend>::encode(
+                    &self.encoder, obs, &self.device,
+                ).unsqueeze_dim(0);
+                let q_values = self.online_net.valid().forward(obs_tensor);
                 let idx: usize = q_values
                     .argmax(1)
                     .into_data()
@@ -335,14 +338,14 @@ where
 impl<E, Enc, Act, B, Buf> Policy<E::Observation, E::Action> for DqnAgent<E, Enc, Act, B, Buf>
 where
     E: Environment,
-    Enc: ObservationEncoder<E::Observation, B>,
+    Enc: ObservationEncoder<E::Observation, B::InnerBackend>,
     Act: DiscreteActionMapper<E::Action>,
     B: AutodiffBackend,
     Buf: ReplayBuffer<E::Observation, E::Action>,
 {
     fn act(&self, obs: &E::Observation) -> E::Action {
         let obs_tensor = self.encoder.encode(obs, &self.device).unsqueeze_dim(0);
-        let q_values = self.online_net.forward(obs_tensor);
+        let q_values = self.online_net.valid().forward(obs_tensor);
         let idx: usize = q_values
             .argmax(1)
             .into_data()

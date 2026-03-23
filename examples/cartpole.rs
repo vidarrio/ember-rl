@@ -36,11 +36,11 @@ const CHECKPOINT_FREQ: usize = 10_000;
 fn cartpole_config() -> DqnConfig {
     DqnConfig {
         gamma: 0.99,
-        learning_rate: 1e-3,
+        learning_rate: 3e-4,
         batch_size: 64,
-        buffer_capacity: 10_000,
+        buffer_capacity: 100_000,
         min_replay_size: 1_000,
-        target_update_freq: 200,
+        target_update_freq: 500,
         hidden_sizes: vec![64, 64],
         epsilon_start: 1.0,
         epsilon_end: 0.01,
