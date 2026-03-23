@@ -32,11 +32,13 @@ Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-ember-rl = "0.2"
+ember-rl = "0.3"
 burn = { version = "0.20.1", features = ["ndarray", "autodiff"] }
 ```
 
-### Training
+### Training with `DqnTrainer`
+
+The simplest entry point — create an agent, wrap it in a trainer, iterate:
 
 ```rust
 use burn::backend::{Autodiff, NdArray};
@@ -57,25 +59,52 @@ let agent = DqnAgent::<MyEnv, _, _, B>::new(
     42,                 // seed
 );
 
-// Attach a named run for checkpointing and stats
+// Attach a named run for automatic checkpointing and JSONL logging
 let run = TrainingRun::create("my_experiment", "v1")?;
 run.write_config(&(&config, VecEncoder::new(obs_size), UsizeActionMapper::new(num_actions)))?;
 
-let mut trainer = DqnTrainer::new(MyEnv::new(), agent, 0)
+let mut trainer = DqnTrainer::new(MyEnv::new(), agent)
     .with_run(run)
     .with_checkpoint_freq(10_000)
     .with_keep_checkpoints(3);
 
-// Imperative: runs n steps, saves checkpoints, logs episodes
-trainer.train(100_000);
-
-// Or iterator-style for manual control
+// Iterator-style — full control over the loop
 for step in trainer.steps().take(100_000) {
     if step.episode_done {
         println!("ep {}  reward {:.1}  ε {:.3}",
             step.episode, step.episode_reward, step.epsilon);
     }
 }
+
+// Eval at end — saves best.mpk automatically
+let report = trainer.eval(20);
+report.print();
+```
+
+### `TrainingSession` — loop-agnostic coordinator
+
+`TrainingSession` is the composable core behind `DqnTrainer`. Use it directly
+when your training loop is owned externally — for example, in a Bevy ECS system:
+
+```rust
+use ember_rl::training::{TrainingSession, TrainingRun};
+use ember_rl::traits::ActMode;
+
+// Any LearningAgent implementation works here
+let session = TrainingSession::new(agent)
+    .with_run(TrainingRun::create("my_experiment", "v1")?)
+    .with_checkpoint_freq(10_000)
+    .with_keep_checkpoints(3);
+
+// Each environment step:
+let action = session.act(&obs, ActMode::Explore);
+session.observe(experience);   // auto-checkpoints at milestones
+
+// Each episode end:
+session.on_episode(total_reward, steps, status, env_extras);
+// → logs to JSONL, merges agent + env extras, saves best checkpoint if improved
+
+if session.is_done() { break; }
 ```
 
 ### Evaluation
@@ -95,7 +124,7 @@ let policy = DqnPolicy::<MyEnv, _, _, NdArray>::new(encoder, mapper, &config, de
 let action = policy.act(&observation);
 ```
 
-### Convert a trained agent directly to an inference policy
+### Convert a trained agent to an inference policy
 
 ```rust
 // into_policy() strips training state and downcasts to a plain Backend
@@ -130,24 +159,34 @@ runs/<name>/<version>/<YYYYMMDD_HHMMSS>/
         step_<N>.mpk       ← periodic checkpoints (pruned to keep_last n)
         latest.mpk         ← most recent checkpoint
         best.mpk           ← best eval-reward checkpoint
-    train_episodes.jsonl   ← one EpisodeRecord per line
+    train_episodes.jsonl   ← one EpisodeRecord per line (reward, length, extras)
     eval_episodes.jsonl    ← eval episodes tagged with total_steps_at_eval
 ```
 
 ## Stats
 
-The `stats` module provides composable statistics tracking:
+The `stats` module provides composable, algorithm-independent statistics tracking.
+Both algorithms and environments can register the stats they want to collect:
 
 ```rust
-use ember_rl::stats::{StatsTracker, StatSource, Mean, Max, RollingMean};
+use ember_rl::stats::{StatsTracker, StatSource, Mean, Max, Std, RollingMean};
 
-let mut tracker = StatsTracker::new()  // default: episode_reward (mean), episode_length (mean)
-    .with("reward_max", StatSource::TotalReward, Max::default())
+// Default tracker: episode_reward (mean) and episode_length (mean)
+let mut tracker = StatsTracker::new()
+    .with("reward_max",   StatSource::TotalReward, Max::default())
+    .with("reward_std",   StatSource::TotalReward, Std::default())
     .with_custom("last10_reward", |r| r.total_reward, RollingMean::new(10));
 
 tracker.update(&episode_record);
 let summary = tracker.summary(); // HashMap<String, f64>
 ```
+
+Available aggregators: `Mean`, `Max`, `Min`, `Last`, `RollingMean`, `Std`.
+
+Per-episode dynamics (e.g. training loss) are captured by the agent via its own
+internal aggregators and exposed through `LearningAgent::episode_extras()`.
+These are merged with environment extras (`Environment::episode_extras()` from
+`rl-traits`) into each `EpisodeRecord` automatically by `TrainingSession`.
 
 ## Implementing `ObservationEncoder`
 
@@ -174,15 +213,14 @@ impl DiscreteActionMapper<MyAction> for MyMapper {
 ```
 
 Built-in `VecEncoder` and `UsizeActionMapper` cover the common `Vec<f32>` /
-`usize` case without any boilerplate. Both implement `serde::Serialize +
-Deserialize`, so they can be written to `config.json` by `TrainingRun`.
+`usize` case without any boilerplate.
 
 ## Reference environments
 
 Enable with `--features envs`:
 
 ```toml
-ember-rl = { version = "0.2", features = ["envs"] }
+ember-rl = { version = "0.3", features = ["envs"] }
 ```
 
 | Environment | Description |
@@ -201,9 +239,8 @@ cargo run --example cartpole --features envs --release -- --eval runs/cartpole/v
 
 ## DQN notes
 
-- **Two separate RNGs.** The trainer drives ε-greedy exploration; the agent
-  drives buffer sampling. These are intentionally decoupled — sharing a single
-  RNG causes subtle learning instability.
+- **Two separate RNGs.** The agent uses independent RNGs for ε-greedy exploration
+  and replay buffer sampling. Sharing a single RNG causes subtle learning instability.
 - **`DqnConfig::default()`** uses conservative general-purpose hyperparameters.
   Domain-specific examples override them explicitly.
 - **Epsilon decay** is linear from `epsilon_start` to `epsilon_end` over
