@@ -1,6 +1,6 @@
 [package]
 name = "ember-rl"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2021"
 description = "Reinforcement learning algorithm implementations (DQN, PPO, SAC) using Burn"
 license = "MIT OR Apache-2.0"

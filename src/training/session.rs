@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Instant;
 
 use rl_traits::{Environment, Experience};
 
@@ -60,6 +61,7 @@ pub struct TrainingSession<E: Environment, A> {
     stats: StatsTracker,
     config: SessionConfig,
     best_eval_reward: f64,
+    start_time: Instant,
     _env: std::marker::PhantomData<E>,
 }
 
@@ -83,6 +85,7 @@ where
             stats: StatsTracker::new(),
             config: SessionConfig::default(),
             best_eval_reward: f64::NEG_INFINITY,
+            start_time: Instant::now(),
             _env: std::marker::PhantomData,
         }
     }
@@ -177,6 +180,13 @@ where
     /// Total environment steps observed so far.
     pub fn total_steps(&self) -> usize {
         self.agent.total_steps()
+    }
+
+    /// Average environment steps per wall-clock second since the session was created.
+    pub fn steps_per_sec(&self) -> f64 {
+        let elapsed = self.start_time.elapsed().as_secs_f64();
+        if elapsed < 1e-6 { return 0.0; }
+        self.agent.total_steps() as f64 / elapsed
     }
 
     /// Returns `true` when `total_steps >= max_steps`.
