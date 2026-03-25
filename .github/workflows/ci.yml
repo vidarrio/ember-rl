@@ -42,11 +42,11 @@ jobs:
         run: |
           CURRENT=$(grep '^version' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
           echo "Attempting to publish version $CURRENT"
-          output=$(cargo publish --allow-dirty 2>&1)
+          set +e
+          cargo publish --allow-dirty > /tmp/publish.log 2>&1
           status=$?
-          echo "$output"
-          if [ $status -ne 0 ] && echo "$output" | grep -q "already exists"; then
-            echo "Version $CURRENT already on crates.io — skipping"
-          elif [ $status -ne 0 ]; then
-            exit 1
+          set -e
+          cat /tmp/publish.log
+          if [ $status -ne 0 ]; then
+            grep -q "already exists" /tmp/publish.log && echo "Version $CURRENT already on crates.io — skipping" || exit 1
           fi
