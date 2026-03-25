@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ember-rl dashboard</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0d1117;
+  color: #e6edf3;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #21262d;
+  flex-wrap: wrap;
+}
+
+.brand {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #58a6ff;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.run-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.run-selector label {
+  font-size: 0.78rem;
+  color: #8b949e;
+  white-space: nowrap;
+}
+
+.run-selector select {
+  flex: 1;
+  min-width: 0;
+  max-width: 420px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e6edf3;
+  font-size: 0.82rem;
+  padding: 5px 10px;
+  cursor: pointer;
+  outline: none;
+}
+
+.run-selector select:focus { border-color: #58a6ff; }
+
+.meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  color: #8b949e;
+  white-space: nowrap;
+}
+
+.pill strong { color: #e6edf3; font-weight: 600; }
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3fb950;
+  flex-shrink: 0;
+  animation: pulse 2s infinite;
+}
+
+.dot.idle { background: #8b949e; animation: none; }
+.dot.off  { background: #f85149; animation: none; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  color: #8b949e;
+  gap: 8px;
+}
+
+.empty-state h2 { font-size: 1rem; font-weight: 500; color: #6e7681; }
+.empty-state p  { font-size: 0.82rem; }
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.card {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 16px 20px 12px;
+}
+
+.card-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8b949e;
+  margin-bottom: 12px;
+}
+
+.chart-wrap { position: relative; height: 200px; }
+
+@media (max-width: 680px) {
+  .grid { grid-template-columns: 1fr; }
+  .meta { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">ember-rl</div>
+  <div class="run-selector" id="run-selector-wrap">
+    <label for="run-select">run</label>
+    <select id="run-select"></select>
+  </div>
+  <div class="meta">
+    <div class="pill">episodes <strong id="ep-count">--</strong></div>
+    <div class="pill">steps <strong id="step-count">--</strong></div>
+    <div class="pill">
+      <div class="dot idle" id="dot"></div>
+      <span id="status">loading</span>
+    </div>
+  </div>
+</header>
+
+<div id="empty-state" class="empty-state" style="display:none">
+  <h2>No runs found</h2>
+  <p>Start training or point the dashboard at a <code>runs/</code> directory.</p>
+</div>
+
+<div class="grid" id="chart-grid" style="display:none">
+  <div class="card">
+    <div class="card-title">Episode Reward</div>
+    <div class="chart-wrap"><canvas id="c-reward"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Episode Length</div>
+    <div class="chart-wrap"><canvas id="c-length"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Exploration (&#949;)</div>
+    <div class="chart-wrap"><canvas id="c-epsilon"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Loss</div>
+    <div class="chart-wrap"><canvas id="c-loss"></canvas></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script>
+'use strict';
+
+Chart.defaults.color = '#8b949e';
+Chart.defaults.borderColor = '#21262d';
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+Chart.defaults.font.size = 11;
+
+var ROLL = 50;
+
+function rollingMean(vals, w) {
+  return vals.map(function(_, i) {
+    var slice = vals.slice(Math.max(0, i - w + 1), i + 1);
+    return slice.reduce(function(a, b) { return a + b; }, 0) / slice.length;
+  });
+}
+
+function makeChart(id, color) {
+  return new Chart(document.getElementById(id), {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: 'raw',
+          data: [],
+          borderColor: color + '30',
+          backgroundColor: 'transparent',
+          pointRadius: 0,
+          borderWidth: 1,
+          tension: 0,
+        },
+        {
+          label: 'mean(' + ROLL + ')',
+          data: [],
+          borderColor: color,
+          backgroundColor: 'transparent',
+          pointRadius: 0,
+          borderWidth: 2,
+          tension: 0.3,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          type: 'linear',
+          ticks: { maxTicksLimit: 6, color: '#6e7681' },
+          grid: { color: '#1c2128' },
+          border: { color: '#30363d' },
+        },
+        y: {
+          ticks: { maxTicksLimit: 5, color: '#6e7681' },
+          grid: { color: '#21262d' },
+          border: { color: '#30363d' },
+        },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#161b22',
+          borderColor: '#30363d',
+          borderWidth: 1,
+          titleColor: '#8b949e',
+          bodyColor: '#e6edf3',
+          callbacks: {
+            title: function(items) {
+              return 'step ' + items[0].parsed.x.toLocaleString();
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+var charts = {
+  reward:  makeChart('c-reward',  '#58a6ff'),
+  length:  makeChart('c-length',  '#3fb950'),
+  epsilon: makeChart('c-epsilon', '#d2a8ff'),
+  loss:    makeChart('c-loss',    '#f0883e'),
+};
+
+function updateChart(chart, steps, vals) {
+  var validSteps = [], validVals = [];
+  for (var i = 0; i < vals.length; i++) {
+    if (vals[i] != null && isFinite(vals[i])) {
+      validSteps.push(steps[i]);
+      validVals.push(vals[i]);
+    }
+  }
+  var means = rollingMean(validVals, ROLL);
+  chart.data.datasets[0].data = validSteps.map(function(s, i) { return { x: s, y: validVals[i] }; });
+  chart.data.datasets[1].data = validSteps.map(function(s, i) { return { x: s, y: means[i] }; });
+  chart.update('none');
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+var selectedPath = null;
+var selectedIsLive = false;
+
+// ── Run list ──────────────────────────────────────────────────────────────────
+
+function formatRunLabel(run) {
+  var label = run.name + ' / ' + run.version + ' / ' + run.run_id;
+  if (run.total_steps > 0) {
+    label += '  (' + run.total_steps.toLocaleString() + ' steps)';
+  }
+  if (run.is_live) { label += '  -- live'; }
+  return label;
+}
+
+function refreshRunList() {
+  fetch('/api/runs')
+    .then(function(r) { return r.json(); })
+    .then(function(runs) {
+      if (runs.length === 0) {
+        document.getElementById('empty-state').style.display = 'flex';
+        document.getElementById('chart-grid').style.display = 'none';
+        document.getElementById('run-selector-wrap').style.display = 'none';
+        document.getElementById('status').textContent = 'no runs';
+        document.getElementById('dot').className = 'dot idle';
+        return;
+      }
+
+      document.getElementById('empty-state').style.display = 'none';
+      document.getElementById('chart-grid').style.display = 'grid';
+      document.getElementById('run-selector-wrap').style.display =
+        runs.length > 1 ? 'flex' : 'none';
+
+      var sel = document.getElementById('run-select');
+      var prevPath = selectedPath;
+
+      sel.innerHTML = '';
+      runs.forEach(function(run) {
+        var opt = document.createElement('option');
+        opt.value = run.path;
+        opt.textContent = formatRunLabel(run);
+        sel.appendChild(opt);
+      });
+
+      // Restore previous selection or default to first (most recent).
+      var stillPresent = prevPath && runs.some(function(r) { return r.path === prevPath; });
+      sel.value = stillPresent ? prevPath : runs[0].path;
+      selectedPath = sel.value;
+      selectedIsLive = runs.find(function(r) { return r.path === selectedPath; }).is_live;
+    })
+    .catch(function() {
+      document.getElementById('status').textContent = 'offline';
+      document.getElementById('dot').className = 'dot off';
+    });
+}
+
+document.getElementById('run-select').addEventListener('change', function() {
+  selectedPath = this.value;
+  var allOptions = Array.from(this.options);
+  // is_live is not in DOM -- re-fetch will update it; treat selection change as non-live until next refresh
+  selectedIsLive = false;
+  pollStats();
+});
+
+// ── Stats polling ─────────────────────────────────────────────────────────────
+
+function pollStats() {
+  if (!selectedPath) return;
+
+  fetch('/api/stats?path=' + encodeURIComponent(selectedPath))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var steps    = data.map(function(d) { return d.step; });
+      var rewards  = data.map(function(d) { return d.reward; });
+      var lengths  = data.map(function(d) { return d.length; });
+      var epsilons = data.map(function(d) { return d.epsilon   != null ? d.epsilon   : null; });
+      var losses   = data.map(function(d) { return d.loss_mean != null ? d.loss_mean : null; });
+
+      updateChart(charts.reward,  steps, rewards);
+      updateChart(charts.length,  steps, lengths);
+      updateChart(charts.epsilon, steps, epsilons);
+      updateChart(charts.loss,    steps, losses);
+
+      document.getElementById('ep-count').textContent  = data.length.toLocaleString();
+      document.getElementById('step-count').textContent =
+        data.length > 0 ? data[data.length - 1].step.toLocaleString() : '--';
+      document.getElementById('status').textContent = selectedIsLive ? 'live' : 'loaded';
+      document.getElementById('dot').className = selectedIsLive ? 'dot' : 'dot idle';
+    })
+    .catch(function() {
+      document.getElementById('status').textContent = 'offline';
+      document.getElementById('dot').className = 'dot off';
+    });
+}
+
+// ── Polling loop ──────────────────────────────────────────────────────────────
+
+refreshRunList();
+setInterval(refreshRunList, 5000);  // picks up new/updated runs
+setInterval(pollStats, 2000);       // refreshes stats for selected run
+</script>
+</body>
+</html>

@@ -215,6 +215,13 @@ impl DiscreteActionMapper<MyAction> for MyMapper {
 Built-in `VecEncoder` and `UsizeActionMapper` cover the common `Vec<f32>` /
 `usize` case without any boilerplate.
 
+## Feature flags
+
+| Feature | Description |
+|---|---|
+| `envs` | Reference environments (CartPole-v1) |
+| `dashboard` | `ember-dashboard` binary for browsing training runs |
+
 ## Reference environments
 
 Enable with `--features envs`:
@@ -226,6 +233,31 @@ ember-rl = { version = "0.3", features = ["envs"] }
 | Environment | Description |
 |---|---|
 | `CartPole-v1` | Classic balance task matching the Gymnasium spec |
+
+## Dashboard
+
+`ember-rl` ships an `ember-dashboard` binary for browsing training runs. It reads
+the `train_episodes.jsonl` files written by `TrainingRun` and serves live-updating
+charts — no changes to your training code required.
+
+```
+# Browse runs/ in the current directory
+cargo run --bin ember-dashboard --features dashboard
+
+# Browse a specific directory
+cargo run --bin ember-dashboard --features dashboard -- --dir path/to/runs
+
+# Install globally
+cargo install ember-rl --features dashboard
+ember-dashboard
+ember-dashboard --dir path/to/runs
+```
+
+Open `http://localhost:6006` in a browser. The dashboard auto-refreshes every
+2 seconds and shows a pulsing indicator next to any run that is actively being
+trained. Use the run selector to switch between runs.
+
+Charts shown: episode reward, episode length, exploration rate (ε), and loss.
 
 ## Running the CartPole example
 

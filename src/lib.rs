@@ -44,3 +44,6 @@ pub mod training;
 
 #[cfg(feature = "envs")]
 pub mod envs;
+
+#[cfg(feature = "dashboard")]
+pub mod dashboard;

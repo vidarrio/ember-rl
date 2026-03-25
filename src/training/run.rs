@@ -128,10 +128,10 @@ impl TrainingRun {
     /// Resume the most recent run found under `base_path`.
     ///
     /// `base_path` can be:
-    /// - An exact run directory (`runs/cartpole/v1/20260322_120000`) — used directly.
-    /// - A name/version directory (`runs/cartpole/v1`) — picks the lexicographically
+    /// - An exact run directory (`runs/cartpole/v1/20260322_120000`) -- used directly.
+    /// - A name/version directory (`runs/cartpole/v1`) -- picks the lexicographically
     ///   latest subdirectory (timestamps sort correctly).
-    /// - A name directory (`runs/cartpole`) — picks latest version, then latest run.
+    /// - A name directory (`runs/cartpole`) -- picks latest version, then latest run.
     ///
     /// Returns an error if no run is found or `metadata.json` is missing/corrupt.
     pub fn resume(base_path: impl AsRef<Path>) -> std::io::Result<Self> {
@@ -198,7 +198,7 @@ impl TrainingRun {
             })
             .collect();
 
-        // Sort lexicographically — step_ prefix + zero-padded or not: sort by step number
+        // Sort lexicographically -- step_ prefix + zero-padded or not: sort by step number
         numbered.sort_by_key(|p| {
             p.file_stem()
                 .and_then(|s| s.to_str())

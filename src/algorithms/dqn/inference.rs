@@ -11,7 +11,7 @@ use super::network::QNetwork;
 
 /// A DQN agent in inference-only mode.
 ///
-/// Holds just the Q-network, encoder, and action mapper — no optimizer,
+/// Holds just the Q-network, encoder, and action mapper -- no optimizer,
 /// no replay buffer, no exploration. Requires only `B: Backend` (not
 /// `AutodiffBackend`), so it can run on plain `NdArray` without any
 /// autodiff overhead.

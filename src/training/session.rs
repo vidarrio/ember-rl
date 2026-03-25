@@ -6,6 +6,7 @@ use crate::stats::{EpisodeRecord, EvalReport, StatsTracker};
 use crate::traits::{ActMode, LearningAgent};
 use crate::training::run::TrainingRun;
 
+
 /// Configuration for a `TrainingSession`.
 #[derive(Debug, Clone)]
 pub struct SessionConfig {
@@ -33,7 +34,7 @@ impl Default for SessionConfig {
 ///
 /// `TrainingSession` wires together a [`LearningAgent`], an optional
 /// [`TrainingRun`], and a [`StatsTracker`]. It is driven purely by incoming
-/// data — it does not own a training loop. Feed it experiences and episode
+/// data -- it does not own a training loop. Feed it experiences and episode
 /// boundaries from wherever your loop lives: a plain `for` loop, Bevy's ECS,
 /// or anything else.
 ///

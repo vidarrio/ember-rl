@@ -43,7 +43,7 @@ pub struct StepMetrics {
 /// environment and drives the training loop. Use [`TrainingSession`] directly
 /// when your loop is owned externally (e.g. Bevy's ECS).
 ///
-/// # Usage — iterator style
+/// # Usage -- iterator style
 ///
 /// ```rust,ignore
 /// let mut trainer = DqnTrainer::new(env, agent);
@@ -55,7 +55,7 @@ pub struct StepMetrics {
 /// }
 /// ```
 ///
-/// # Usage — imperative style with run tracking
+/// # Usage -- imperative style with run tracking
 ///
 /// ```rust,ignore
 /// let mut trainer = DqnTrainer::new(env, agent)

@@ -3,7 +3,7 @@ use burn::prelude::*;
 /// Converts environment observations into Burn tensors.
 ///
 /// This is the primary bridge between rl-traits' generic world and Burn's
-/// tensor world. Users implement this for their specific observation type —
+/// tensor world. Users implement this for their specific observation type --
 /// for CartPole it's 4 floats stacked into a 1D tensor; for Atari it would
 /// be image preprocessing.
 ///
@@ -18,7 +18,7 @@ use burn::prelude::*;
 ///
 /// `encode_batch` has a default implementation that calls `encode` in a loop,
 /// which is correct but slow. Override it with a vectorised implementation
-/// if your observation type allows it — which for simple flat observations
+/// if your observation type allows it -- which for simple flat observations
 /// (like CartPole) it always does.
 pub trait ObservationEncoder<O, B: Backend> {
     /// The number of features in the encoded observation vector.
@@ -67,12 +67,12 @@ pub trait DiscreteActionMapper<A> {
 
     /// Convert an action to its integer index.
     ///
-    /// Used when storing experience — we record the index, not the action.
+    /// Used when storing experience -- we record the index, not the action.
     fn action_to_index(&self, action: &A) -> usize;
 
     /// Convert an integer index to an action.
     ///
-    /// Used when the Q-network selects an action — it returns an argmax
+    /// Used when the Q-network selects an action -- it returns an argmax
     /// index that we convert back to the environment's action type.
     fn index_to_action(&self, index: usize) -> A;
 }

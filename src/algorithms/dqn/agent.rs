@@ -29,7 +29,7 @@ use rl_traits::ReplayBuffer;
 /// - `Enc`: the observation encoder (converts `E::Observation` to tensors)
 /// - `Act`: the action mapper (converts `E::Action` to/from integer indices)
 /// - `B`: the Burn backend (e.g. `NdArray`, `Wgpu`)
-/// - `Buf`: the replay buffer (defaults to `CircularBuffer` — swap for PER etc.)
+/// - `Buf`: the replay buffer (defaults to `CircularBuffer` -- swap for PER etc.)
 pub struct DqnAgent<E, Enc, Act, B, Buf = CircularBuffer<
     <E as Environment>::Observation,
     <E as Environment>::Action,
@@ -58,7 +58,7 @@ where
     device: B::Device,
     total_steps: usize,
 
-    // Two decoupled RNGs — sharing one causes correlated sampling/exploration.
+    // Two decoupled RNGs -- sharing one causes correlated sampling/exploration.
     explore_rng: SmallRng,  // drives ε-greedy action selection
     sample_rng: SmallRng,   // drives replay buffer sampling
 
@@ -260,7 +260,7 @@ where
     fn act(&mut self, obs: &E::Observation, mode: ActMode) -> E::Action {
         match mode {
             ActMode::Exploit => {
-                // Greedy argmax via the inner (non-autodiff) network — no gradient
+                // Greedy argmax via the inner (non-autodiff) network -- no gradient
                 // bookkeeping overhead, same weights, same device type.
                 let obs_tensor = ObservationEncoder::<E::Observation, B::InnerBackend>::encode(
                     &self.encoder, obs, &self.device,

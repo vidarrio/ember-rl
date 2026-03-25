@@ -8,8 +8,8 @@
 //!
 //! # Spaces
 //!
-//! - **Observation**: `Vec<f32>` — `[x, ẋ, θ, θ̇]`
-//! - **Action**: `usize` — `0` = push left, `1` = push right
+//! - **Observation**: `Vec<f32>` -- `[x, ẋ, θ, θ̇]`
+//! - **Action**: `usize` -- `0` = push left, `1` = push right
 //! - **Reward**: `1.0` per step
 
 use rand::{Rng, SeedableRng};

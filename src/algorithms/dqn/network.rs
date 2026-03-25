@@ -15,7 +15,7 @@ use burn::nn::{Linear, LinearConfig, Relu};
 ///
 /// DQN requires two copies of the network: the online network (updated every
 /// step) and the target network (periodically synced from online). Burn's
-/// `Module::clone()` gives us the target network for free — it performs a
+/// `Module::clone()` gives us the target network for free -- it performs a
 /// deep clone of all parameters.
 #[derive(Module, Debug)]
 pub struct QNetwork<B: Backend> {

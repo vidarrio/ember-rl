@@ -14,7 +14,7 @@ use rl_traits::{Environment, Experience};
 /// Controls whether an agent acts to explore or exploit.
 ///
 /// Passed to [`LearningAgent::act`] to select the agent's action strategy.
-/// Algorithms interpret this mode internally — DQN uses epsilon-greedy for
+/// Algorithms interpret this mode internally -- DQN uses epsilon-greedy for
 /// `Explore` and greedy argmax for `Exploit`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActMode {
@@ -28,7 +28,7 @@ pub enum ActMode {
 
 /// An agent whose weights can be saved to and loaded from disk.
 pub trait Checkpointable: Sized {
-    /// Save weights to `path` (without extension — implementations add their own).
+    /// Save weights to `path` (without extension -- implementations add their own).
     fn save(&self, path: &Path) -> anyhow::Result<()>;
 
     /// Load weights from `path`, consuming and returning `self`.
@@ -40,7 +40,7 @@ pub trait Checkpointable: Sized {
 /// An agent that can act, learn from experience, and report training stats.
 ///
 /// Implemented by all algorithm agents (`DqnAgent`, future `PpoAgent`, etc.).
-/// The agent owns its exploration RNG internally — no external RNG is needed
+/// The agent owns its exploration RNG internally -- no external RNG is needed
 /// at call sites.
 ///
 /// # Episode extras
