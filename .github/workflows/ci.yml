@@ -41,9 +41,12 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           CURRENT=$(grep '^version' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-          if curl -sf "https://crates.io/api/v1/crates/ember-rl/$CURRENT" > /dev/null; then
-            echo "Version $CURRENT is already on crates.io — skipping publish"
-          else
-            echo "Publishing version $CURRENT"
-            cargo publish --allow-dirty
+          echo "Attempting to publish version $CURRENT"
+          output=$(cargo publish --allow-dirty 2>&1)
+          status=$?
+          echo "$output"
+          if [ $status -ne 0 ] && echo "$output" | grep -q "already exists"; then
+            echo "Version $CURRENT already on crates.io — skipping"
+          elif [ $status -ne 0 ]; then
+            exit 1
           fi
