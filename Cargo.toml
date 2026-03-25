@@ -13,7 +13,11 @@ envs = []
 dashboard = ["dep:tiny_http"]
 
 [[example]]
-name = "cartpole"
+name = "cartpole_dqn"
+required-features = ["envs"]
+
+[[example]]
+name = "cartpole_ppo"
 required-features = ["envs"]
 
 [[bin]]

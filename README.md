@@ -20,11 +20,11 @@ neural networks, replay buffers, and training loops — you bring the environmen
 
 ## Algorithms
 
-| Algorithm | Status |
-|---|---|
-| DQN | Stable |
-| PPO | Planned |
-| SAC | Planned |
+| Algorithm | Status | Action space |
+|---|---|---|
+| DQN | Stable | Discrete |
+| PPO | Stable | Discrete (continuous planned) |
+| SAC | Planned | Continuous |
 
 ## Usage
 
@@ -259,14 +259,17 @@ trained. Use the run selector to switch between runs.
 
 Charts shown: episode reward, episode length, exploration rate (ε), and loss.
 
-## Running the CartPole example
+## Examples
 
 ```
-# Train (saves checkpoints to runs/cartpole/v1/<timestamp>/)
-cargo run --example cartpole --features envs --release
+# DQN -- train CartPole-v1
+cargo run --example cartpole_dqn --features envs --release
 
-# Eval from the latest saved run
-cargo run --example cartpole --features envs --release -- --eval runs/cartpole/v1
+# DQN -- eval from the latest saved run
+cargo run --example cartpole_dqn --features envs --release -- --eval runs/cartpole/v1
+
+# PPO -- train CartPole-v1
+cargo run --example cartpole_ppo --features envs --release
 ```
 
 ## DQN notes
@@ -282,6 +285,26 @@ cargo run --example cartpole --features envs --release -- --eval runs/cartpole/v
 - **Checkpoints** use Burn's `CompactRecorder` (MessagePack format, `.mpk`).
   Only network weights are saved — sufficient for inference. Resume training
   by calling `agent.load(path)` followed by `agent.set_total_steps(n)`.
+
+## PPO notes
+
+- **On-policy.** Experience is collected into a rollout buffer, used for `n_epochs`
+  gradient passes, then discarded. There is no replay buffer.
+- **Parallel environments.** Set `PpoConfig::n_envs` to match the number of
+  environments feeding the agent. Each env contributes to the same rollout; the
+  update fires automatically after `n_steps` ticks across all envs. This is the
+  primary reason to use PPO with `bevy-gym`.
+- **GAE.** Advantages are computed with Generalized Advantage Estimation
+  (`gae_lambda`). `lambda=1.0` is full Monte Carlo; `lambda=0.0` is TD(0).
+  Advantages are normalized to zero mean, unit variance before each update.
+- **Clipped surrogate.** The `clip_epsilon` parameter (default 0.2) prevents
+  excessively large policy updates. Smaller values are more conservative.
+- **`PpoConfig::default()`** targets small discrete environments like CartPole.
+  Larger or harder tasks typically need more `n_steps`, more `n_epochs`, and a
+  higher `entropy_coef` to prevent premature convergence.
+- **act/observe pairing.** `PpoAgent` caches `(log_prob, value)` from each
+  `act()` call in a FIFO queue and pops it in the corresponding `observe()` call.
+  This works correctly with both sequential loops and `bevy-gym`'s parallel ECS flow.
 
 ## Development
 
