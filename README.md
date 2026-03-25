@@ -261,50 +261,17 @@ Charts shown: episode reward, episode length, exploration rate (ε), and loss.
 
 ## Examples
 
-```
-# DQN -- train CartPole-v1
-cargo run --example cartpole_dqn --features envs --release
+| Example | Algorithm | Notes |
+|---|---|---|
+| [`cartpole_dqn`](docs/examples/cartpole_dqn.md) | DQN | Train + eval CartPole-v1, checkpoint resume |
+| [`cartpole_ppo`](docs/examples/cartpole_ppo.md) | PPO | Train CartPole-v1 with TrainingSession |
 
-# DQN -- eval from the latest saved run
-cargo run --example cartpole_dqn --features envs --release -- --eval runs/cartpole/v1
+## Algorithm notes
 
-# PPO -- train CartPole-v1
-cargo run --example cartpole_ppo --features envs --release
-```
+Detailed hyperparameter references and implementation notes:
 
-## DQN notes
-
-- **Two separate RNGs.** The agent uses independent RNGs for ε-greedy exploration
-  and replay buffer sampling. Sharing a single RNG causes subtle learning instability.
-- **`DqnConfig::default()`** uses conservative general-purpose hyperparameters.
-  Domain-specific examples override them explicitly.
-- **Epsilon decay** is linear from `epsilon_start` to `epsilon_end` over
-  `epsilon_decay_steps`, then flat.
-- **Target network** is a hard-copy of the online network, updated every
-  `target_update_freq` steps.
-- **Checkpoints** use Burn's `CompactRecorder` (MessagePack format, `.mpk`).
-  Only network weights are saved — sufficient for inference. Resume training
-  by calling `agent.load(path)` followed by `agent.set_total_steps(n)`.
-
-## PPO notes
-
-- **On-policy.** Experience is collected into a rollout buffer, used for `n_epochs`
-  gradient passes, then discarded. There is no replay buffer.
-- **Parallel environments.** Set `PpoConfig::n_envs` to match the number of
-  environments feeding the agent. Each env contributes to the same rollout; the
-  update fires automatically after `n_steps` ticks across all envs. This is the
-  primary reason to use PPO with `bevy-gym`.
-- **GAE.** Advantages are computed with Generalized Advantage Estimation
-  (`gae_lambda`). `lambda=1.0` is full Monte Carlo; `lambda=0.0` is TD(0).
-  Advantages are normalized to zero mean, unit variance before each update.
-- **Clipped surrogate.** The `clip_epsilon` parameter (default 0.2) prevents
-  excessively large policy updates. Smaller values are more conservative.
-- **`PpoConfig::default()`** targets small discrete environments like CartPole.
-  Larger or harder tasks typically need more `n_steps`, more `n_epochs`, and a
-  higher `entropy_coef` to prevent premature convergence.
-- **act/observe pairing.** `PpoAgent` caches `(log_prob, value)` from each
-  `act()` call in a FIFO queue and pops it in the corresponding `observe()` call.
-  This works correctly with both sequential loops and `bevy-gym`'s parallel ECS flow.
+- [DQN](docs/algorithms/dqn.md)
+- [PPO](docs/algorithms/ppo.md)
 
 ## Development
 
